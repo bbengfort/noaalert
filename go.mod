@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/joho/godotenv v1.5.1
 	github.com/oklog/ulid v1.3.1
-	github.com/rotationalio/go-ensign v0.4.3-0.20230321181154-c40a229f2d6f
+	github.com/rotationalio/go-ensign v0.4.3-0.20230321190313-00b7d47d1272
 )
 
 require (

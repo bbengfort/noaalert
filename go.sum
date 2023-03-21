@@ -18,6 +18,8 @@ github.com/rotationalio/go-ensign v0.4.3-0.20230320222452-c6aac5095578 h1:TwIJwH
 github.com/rotationalio/go-ensign v0.4.3-0.20230320222452-c6aac5095578/go.mod h1:t2vwjYwV6RaAMG40JlupNxHfkpVxxNB6mP/k212uHNs=
 github.com/rotationalio/go-ensign v0.4.3-0.20230321181154-c40a229f2d6f h1:u0IqFIC1QyJdtA7Lm1PoBjSbjCrU/6mZkif6+HnZm+M=
 github.com/rotationalio/go-ensign v0.4.3-0.20230321181154-c40a229f2d6f/go.mod h1:tqPQGdnKjNJY88ASXPfm0igLf6EFzC2nthLfXBVJVLw=
+github.com/rotationalio/go-ensign v0.4.3-0.20230321190313-00b7d47d1272 h1:mmxxHWyEXs61Fh4X8eL/s3lr08/NKDweHlxCg3IoUQw=
+github.com/rotationalio/go-ensign v0.4.3-0.20230321190313-00b7d47d1272/go.mod h1:tqPQGdnKjNJY88ASXPfm0igLf6EFzC2nthLfXBVJVLw=
 github.com/spaolacci/murmur3 v1.1.0 h1:7c1g84S4BPRrfL5Xrdp6fOJ206sU9y293DDHaoy0bLI=
 github.com/spaolacci/murmur3 v1.1.0/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 github.com/stretchr/testify v1.8.2 h1:+h33VjcLVPDHtOdpUCuF+7gSuG3yGIftsP1YvFihtJ8=

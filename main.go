@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -42,6 +43,7 @@ func main() {
 		if topicID, err = client.CreateTopic(context.Background(), NOAAAlerts); err != nil {
 			log.Fatal(err)
 		}
+		fmt.Println(topicID)
 	} else {
 		// Lookup the topic ID for use in the publisher
 		if topicID, err = client.TopicID(context.Background(), NOAAAlerts); err != nil {
@@ -49,6 +51,24 @@ func main() {
 		}
 	}
 
+	// Run a subscriber
+	go func() {
+		sub, err := client.Subscribe(context.Background(), topicID)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		msgs, err := sub.Subscribe()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for msg := range msgs {
+			fmt.Println(msg)
+		}
+	}()
+
+	time.Sleep(1 * time.Second)
 	pub, err := client.Publish(context.Background())
 	if err != nil {
 		log.Fatal(err)
@@ -71,4 +91,5 @@ func main() {
 	e.Data, _ = json.Marshal(data)
 
 	pub.Publish(topicID, e)
+	time.Sleep(1 * time.Second)
 }
