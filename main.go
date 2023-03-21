@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/oklog/ulid"
 	ensign "github.com/rotationalio/go-ensign"
 	api "github.com/rotationalio/go-ensign/api/v1beta1"
 	mimetype "github.com/rotationalio/go-ensign/mimetype/v1beta1"
@@ -44,22 +43,10 @@ func main() {
 			log.Fatal(err)
 		}
 	} else {
-		// TODO: use a topic lookup method or don't even worry about this
-		topics, err := client.ListTopics(context.Background())
-		if err != nil {
+		// Lookup the topic ID for use in the publisher
+		if topicID, err = client.TopicID(context.Background(), NOAAAlerts); err != nil {
 			log.Fatal(err)
 		}
-
-		for _, topic := range topics {
-			if topic.Name == NOAAAlerts {
-				var topicULID ulid.ULID
-				if err = topicULID.UnmarshalBinary(topic.Id); err != nil {
-					log.Fatal(err)
-				}
-				topicID = topicULID.String()
-			}
-		}
-
 	}
 
 	pub, err := client.Publish(context.Background())
