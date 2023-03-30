@@ -25,12 +25,19 @@ func main() {
 		ClientID:     os.Getenv("ENSIGN_CLIENT_ID"),
 		ClientSecret: os.Getenv("ENSIGN_CLIENT_SECRET"),
 		AuthURL:      "https://auth.ensign.world",
-		Endpoint:     "ensign.ninja:443",
+		Endpoint:     "staging.ensign.world:443",
 	})
 
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Get ensign status
+	status, err := client.EnsignClient().Status(context.Background(), &api.HealthCheck{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println(status)
 
 	// List topics to check if the topic exists
 	exists, err := client.TopicExists(context.Background(), NOAAAlerts)
