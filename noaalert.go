@@ -2,22 +2,21 @@ package noaalert
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/cookiejar"
 	"os"
 	"os/signal"
 	"time"
 
 	sdk "github.com/rotationalio/go-ensign"
 	api "github.com/rotationalio/go-ensign/api/v1beta1"
+	mimetype "github.com/rotationalio/go-ensign/mimetype/v1beta1"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 const (
-	Topic     = "noaa-alerts"
-	UserAgent = "(bbengfort.github.io, benjamin@bengfort.com)"
+	Topic = "noaa-alerts"
 )
 
 func init() {
@@ -46,7 +45,7 @@ func TopicID(client *sdk.Client, create bool) (topicID string, err error) {
 }
 
 type Publisher struct {
-	api     *http.Client
+	api     *Weather
 	ensign  *sdk.Client
 	conf    Config
 	started time.Time
@@ -67,16 +66,11 @@ func New(conf Config) (pub *Publisher, err error) {
 	pub = &Publisher{
 		conf:  conf,
 		echan: make(chan error, 1),
-		api: &http.Client{
-			Transport:     nil,
-			CheckRedirect: nil,
-			Timeout:       30 * time.Second,
-		},
 	}
 
-	// Create cookie jar for client
-	if pub.api.Jar, err = cookiejar.New(nil); err != nil {
-		return nil, fmt.Errorf("could not create cookiejar: %w", err)
+	// Connect to Weather.gov
+	if pub.api, err = NewWeatherAPI(); err != nil {
+		return nil, err
 	}
 
 	// Connect to Ensign
@@ -97,7 +91,7 @@ func (p *Publisher) Run() error {
 	}()
 
 	p.started = time.Now()
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(p.conf.Interval)
 
 	topicID, err := TopicID(p.ensign, p.conf.EnsureTopicExists)
 	if err != nil {
@@ -114,12 +108,42 @@ func (p *Publisher) Run() error {
 		select {
 		case err := <-p.echan:
 			return err
-		case ts := <-ticker.C:
-			pub.Publish(topicID, &api.Event{Data: []byte(ts.Format(time.RFC3339Nano))})
+		case <-ticker.C:
+			count := 0
+			for _, alert := range p.Alerts() {
+				pub.Publish(topicID, &api.Event{Data: alert, Mimetype: mimetype.ApplicationJSON})
+				count++
+			}
+			log.Info().Int("count", count).Msg("weather alerts published")
 		}
 	}
 }
 
 func (p *Publisher) Shutdown() (err error) {
 	return nil
+}
+
+func (p *Publisher) Alerts() [][]byte {
+	// TODO: set default timeout in configuration
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	alerts, err := p.api.Alerts(ctx)
+	if err != nil {
+		log.Warn().Err(err).Msg("could not fetch noaa alerts")
+		return nil
+	}
+
+	data := make([][]byte, 0, len(alerts))
+	for _, alert := range alerts {
+		// TODO: don't republish alerts
+		alertjson, err := json.Marshal(alert)
+		if err != nil {
+			log.Warn().Err(err).Msg("could not parse alert json")
+			continue
+		}
+		data = append(data, alertjson)
+	}
+
+	return data
 }

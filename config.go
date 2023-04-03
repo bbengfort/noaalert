@@ -1,6 +1,8 @@
 package noaalert
 
 import (
+	"time"
+
 	"github.com/kelseyhightower/envconfig"
 	sdk "github.com/rotationalio/go-ensign"
 )
@@ -8,8 +10,9 @@ import (
 const prefix = "noaalert"
 
 type Config struct {
-	ConsoleLog        bool `split_words:"true" default:"false"`
-	EnsureTopicExists bool `split_words:"true" default:"false"`
+	ConsoleLog        bool          `split_words:"true" default:"false"`
+	EnsureTopicExists bool          `split_words:"true" default:"false"`
+	Interval          time.Duration `default:"5m"`
 	Ensign            EnsignConfig
 	processed         bool
 }
