@@ -1,19 +1,23 @@
 package noaalert
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rotationalio/confire"
 	sdk "github.com/rotationalio/go-ensign"
+	"github.com/rs/zerolog"
 )
 
 const prefix = "noaalert"
 
 type Config struct {
-	ConsoleLog        bool          `split_words:"true" default:"false"`
 	Topic             string        `default:"noaa-alerts" required:"true"`
 	EnsureTopicExists bool          `split_words:"true" default:"false"`
-	Interval          time.Duration `default:"5m"`
+	Interval          time.Duration `default:"5m" required:"true"`
+	ConsoleLog        bool          `split_words:"true" default:"false"`
+	LogLevel          LevelDecoder  `default:"info" split_words:"true"`
 	Ensign            EnsignConfig
 	processed         bool
 }
@@ -66,4 +70,47 @@ func (c EnsignConfig) Options() []sdk.Option {
 		opts = append(opts, sdk.WithAuthenticator(c.AuthURL, false))
 	}
 	return opts
+}
+
+// Parse and return the zerolog log level for configuring global logging.
+func (c Config) GetLogLevel() zerolog.Level {
+	return zerolog.Level(c.LogLevel)
+}
+
+// LogLevelDecoder deserializes the log level from a config string.
+type LevelDecoder zerolog.Level
+
+// Names of log levels for use in encoding/decoding from strings.
+const (
+	llPanic = "panic"
+	llFatal = "fatal"
+	llError = "error"
+	llWarn  = "warn"
+	llInfo  = "info"
+	llDebug = "debug"
+	llTrace = "trace"
+)
+
+// Decode implements confire Decoder interface.
+func (ll *LevelDecoder) Decode(value string) error {
+	value = strings.TrimSpace(strings.ToLower(value))
+	switch value {
+	case llPanic:
+		*ll = LevelDecoder(zerolog.PanicLevel)
+	case llFatal:
+		*ll = LevelDecoder(zerolog.FatalLevel)
+	case llError:
+		*ll = LevelDecoder(zerolog.ErrorLevel)
+	case llWarn:
+		*ll = LevelDecoder(zerolog.WarnLevel)
+	case llInfo:
+		*ll = LevelDecoder(zerolog.InfoLevel)
+	case llDebug:
+		*ll = LevelDecoder(zerolog.DebugLevel)
+	case llTrace:
+		*ll = LevelDecoder(zerolog.TraceLevel)
+	default:
+		return fmt.Errorf("unknown log level %q", value)
+	}
+	return nil
 }

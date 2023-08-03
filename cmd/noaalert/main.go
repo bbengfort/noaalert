@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/bbengfort/noaalert"
 	"github.com/joho/godotenv"
@@ -29,6 +31,11 @@ func main() {
 			Name:   "subscribe",
 			Usage:  "subscribe to NOAA alerts on Ensign",
 			Action: subscribe,
+		},
+		{
+			Name:   "alerts",
+			Usage:  "get active NOAA alerts",
+			Action: alerts,
 		},
 	}
 
@@ -75,6 +82,32 @@ func subscribe(c *cli.Context) (err error) {
 		// TODO: do a better job of printing events out
 		fmt.Println(event)
 		event.Ack()
+	}
+	return nil
+}
+
+func alerts(c *cli.Context) (err error) {
+	var api *noaalert.Weather
+	if api, err = noaalert.NewWeatherAPI(); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var features []interface{}
+	if features, err = api.Alerts(ctx); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	for _, feature := range features {
+		fmap := feature.(map[string]interface{})
+		props := fmap["properties"].(map[string]interface{})
+
+		headline, ok := props["headline"].(string)
+		if ok {
+			fmt.Println(headline)
+		}
 	}
 	return nil
 }
