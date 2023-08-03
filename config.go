@@ -3,7 +3,7 @@ package noaalert
 import (
 	"time"
 
-	"github.com/kelseyhightower/envconfig"
+	"github.com/rotationalio/confire"
 	sdk "github.com/rotationalio/go-ensign"
 )
 
@@ -11,6 +11,7 @@ const prefix = "noaalert"
 
 type Config struct {
 	ConsoleLog        bool          `split_words:"true" default:"false"`
+	Topic             string        `default:"noaa-alerts" required:"true"`
 	EnsureTopicExists bool          `split_words:"true" default:"false"`
 	Interval          time.Duration `default:"5m"`
 	Ensign            EnsignConfig
@@ -18,18 +19,14 @@ type Config struct {
 }
 
 type EnsignConfig struct {
-	ClientID     string `envconfig:"ENSIGN_CLIENT_ID"`
-	ClientSecret string `envconfig:"ENSIGN_CLIENT_SECRET"`
-	Endpoint     string `envconfig:"ENSIGN_ENDPOINT"`
-	AuthURL      string `envconfig:"ENSIGN_AUTH_URL"`
+	ClientID     string `env:"ENSIGN_CLIENT_ID" required:"true"`
+	ClientSecret string `env:"ENSIGN_CLIENT_SECRET" required:"true"`
+	Endpoint     string `env:"ENSIGN_ENDPOINT"`
+	AuthURL      string `env:"ENSIGN_AUTH_URL"`
 }
 
 func NewConfig() (conf Config, err error) {
-	if err = envconfig.Process(prefix, &conf); err != nil {
-		return conf, err
-	}
-
-	if err = conf.Validate(); err != nil {
+	if err = confire.Process(prefix, &conf); err != nil {
 		return conf, err
 	}
 
@@ -57,23 +54,16 @@ func (c Config) Validate() (err error) {
 	return nil
 }
 
-func (c EnsignConfig) Options() *sdk.Options {
-	opts := sdk.NewOptions()
-	if c.ClientID != "" {
-		opts.ClientID = c.ClientID
-	}
-
-	if c.ClientSecret != "" {
-		opts.ClientSecret = c.ClientSecret
-	}
+func (c EnsignConfig) Options() []sdk.Option {
+	opts := make([]sdk.Option, 0, 3)
+	opts = append(opts, sdk.WithCredentials(c.ClientID, c.ClientSecret))
 
 	if c.Endpoint != "" {
-		opts.Endpoint = c.Endpoint
+		opts = append(opts, sdk.WithEnsignEndpoint(c.Endpoint, false))
 	}
 
 	if c.AuthURL != "" {
-		opts.AuthURL = c.AuthURL
+		opts = append(opts, sdk.WithAuthenticator(c.AuthURL, false))
 	}
-
 	return opts
 }

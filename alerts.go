@@ -1,11 +1,9 @@
 package noaalert
 
 import (
-	"context"
 	"os"
 
 	sdk "github.com/rotationalio/go-ensign"
-	api "github.com/rotationalio/go-ensign/api/v1beta1"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -30,23 +28,20 @@ func NewAlerts(conf Config) (sub *Subscriber, err error) {
 		conf: conf,
 	}
 
-	if sub.ensign, err = sdk.New(conf.Ensign.Options()); err != nil {
+	if sub.ensign, err = sdk.New(conf.Ensign.Options()...); err != nil {
 		return nil, err
+	}
+
+	// If we need to ensure the topic exists, perform the check.
+	if conf.EnsureTopicExists {
+		if err = EnsureTopicExists(sub.ensign, conf.Topic); err != nil {
+			return nil, err
+		}
 	}
 
 	return sub, nil
 }
 
-func (s *Subscriber) Listen() (<-chan *api.Event, error) {
-	topicID, err := TopicID(s.ensign, s.conf.EnsureTopicExists)
-	if err != nil {
-		return nil, err
-	}
-
-	stream, err := s.ensign.Subscribe(context.Background(), topicID)
-	if err != nil {
-		return nil, err
-	}
-
-	return stream.Subscribe()
+func (s *Subscriber) Listen() (*sdk.Subscription, error) {
+	return s.ensign.Subscribe(s.conf.Topic)
 }

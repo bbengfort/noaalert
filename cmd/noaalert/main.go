@@ -6,7 +6,7 @@ import (
 
 	"github.com/bbengfort/noaalert"
 	"github.com/joho/godotenv"
-	api "github.com/rotationalio/go-ensign/api/v1beta1"
+	"github.com/rotationalio/go-ensign"
 	"github.com/rs/zerolog/log"
 	cli "github.com/urfave/cli/v2"
 )
@@ -17,8 +17,8 @@ func main() {
 
 	app := cli.NewApp()
 	app.Name = "noaalert"
-	app.Version = "1.0.0"
-	app.Usage = "publish NOAA weather alerts to ensign"
+	app.Version = noaalert.Version()
+	app.Usage = "publish NOAA weather alerts to Ensign"
 	app.Commands = []*cli.Command{
 		{
 			Name:   "publish",
@@ -65,14 +65,16 @@ func subscribe(c *cli.Context) (err error) {
 		return cli.Exit(err, 1)
 	}
 
-	var events <-chan *api.Event
+	var events *ensign.Subscription
 	if events, err = sub.Listen(); err != nil {
 		return cli.Exit(err, 1)
 	}
+	defer events.Close()
 
-	for event := range events {
+	for event := range events.C {
 		// TODO: do a better job of printing events out
 		fmt.Println(event)
+		event.Ack()
 	}
 	return nil
 }

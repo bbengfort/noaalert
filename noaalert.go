@@ -3,20 +3,14 @@ package noaalert
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/signal"
 	"time"
 
 	sdk "github.com/rotationalio/go-ensign"
-	api "github.com/rotationalio/go-ensign/api/v1beta1"
 	mimetype "github.com/rotationalio/go-ensign/mimetype/v1beta1"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-)
-
-const (
-	Topic = "noaa-alerts"
 )
 
 func init() {
@@ -24,24 +18,6 @@ func init() {
 	zerolog.TimeFieldFormat = time.RFC3339
 	zerolog.DurationFieldInteger = false
 	zerolog.DurationFieldUnit = time.Millisecond
-}
-
-func TopicID(client *sdk.Client, create bool) (topicID string, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var exists bool
-	if exists, err = client.TopicExists(ctx, Topic); err != nil {
-		return "", err
-	}
-
-	if !exists {
-		if create {
-			return client.CreateTopic(ctx, Topic)
-		}
-		return "", fmt.Errorf("topic %q does not exist", Topic)
-	}
-	return client.TopicID(ctx, Topic)
 }
 
 type Publisher struct {
@@ -74,8 +50,15 @@ func New(conf Config) (pub *Publisher, err error) {
 	}
 
 	// Connect to Ensign
-	if pub.ensign, err = sdk.New(conf.Ensign.Options()); err != nil {
+	if pub.ensign, err = sdk.New(conf.Ensign.Options()...); err != nil {
 		return nil, err
+	}
+
+	// If we need to ensure the topic exists, perform the check.
+	if conf.EnsureTopicExists {
+		if err = EnsureTopicExists(pub.ensign, conf.Topic); err != nil {
+			return nil, err
+		}
 	}
 
 	return pub, nil
@@ -93,17 +76,8 @@ func (p *Publisher) Run() error {
 	p.started = time.Now()
 	ticker := time.NewTicker(p.conf.Interval)
 
-	topicID, err := TopicID(p.ensign, p.conf.EnsureTopicExists)
-	if err != nil {
-		return err
-	}
-
-	pub, err := p.ensign.Publish(context.Background())
-	if err != nil {
-		return err
-	}
-
 	// Begin API query loop
+queryLoop:
 	for {
 		select {
 		case err := <-p.echan:
@@ -111,7 +85,13 @@ func (p *Publisher) Run() error {
 		case <-ticker.C:
 			count := 0
 			for _, alert := range p.Alerts() {
-				pub.Publish(topicID, &api.Event{Data: alert, Mimetype: mimetype.ApplicationJSON})
+				event := &sdk.Event{Data: alert, Mimetype: mimetype.ApplicationJSON}
+				if err := p.ensign.Publish(p.conf.Topic, event); err != nil {
+					log.Error().Err(err).Int("count", count).Msg("could not publish weather alert")
+					continue queryLoop
+				}
+
+				// TODO: check acks/nacks
 				count++
 			}
 			log.Info().Int("count", count).Msg("weather alerts published")
@@ -120,6 +100,11 @@ func (p *Publisher) Run() error {
 }
 
 func (p *Publisher) Shutdown() (err error) {
+	log.Info().Msg("shutting alert publisher down")
+	if err = p.ensign.Close(); err != nil {
+		return err
+	}
+	log.Debug().Msg("gracefully shut down alert publisher")
 	return nil
 }
 
