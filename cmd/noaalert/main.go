@@ -138,7 +138,7 @@ func usage(c *cli.Context) (err error) {
 	}
 
 	var conf noaalert.Config
-	if err := confire.Usagef("ensign", &conf, tabs, format); err != nil {
+	if err := confire.Usagef("noaalert", &conf, tabs, format); err != nil {
 		return cli.Exit(err, 1)
 	}
 	tabs.Flush()
