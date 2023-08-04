@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"text/tabwriter"
 	"time"
 
 	"github.com/bbengfort/noaalert"
 	"github.com/joho/godotenv"
+	confire "github.com/rotationalio/confire/usage"
 	"github.com/rs/zerolog/log"
 	cli "github.com/urfave/cli/v2"
 )
@@ -22,19 +24,35 @@ func main() {
 	app.Usage = "publish NOAA weather alerts to Ensign"
 	app.Commands = []*cli.Command{
 		{
-			Name:   "publish",
-			Usage:  "run the publisher daemon to fetch alerts from the NOAA API",
-			Action: publish,
+			Name:     "publish",
+			Usage:    "run the publisher daemon to fetch alerts from the NOAA API",
+			Category: "server",
+			Action:   publish,
 		},
 		{
-			Name:   "subscribe",
-			Usage:  "subscribe to NOAA alerts on Ensign",
-			Action: subscribe,
+			Name:     "subscribe",
+			Category: "utility",
+			Usage:    "subscribe to NOAA alerts on Ensign",
+			Action:   subscribe,
 		},
 		{
-			Name:   "alerts",
-			Usage:  "get active NOAA alerts",
-			Action: alerts,
+			Name:     "alerts",
+			Category: "utility",
+			Usage:    "get active NOAA alerts",
+			Action:   alerts,
+		},
+		{
+			Name:     "config",
+			Usage:    "print noaalerts configuration guide",
+			Category: "utility",
+			Action:   usage,
+			Flags: []cli.Flag{
+				&cli.BoolFlag{
+					Name:    "list",
+					Aliases: []string{"l"},
+					Usage:   "print in list mode instead of table mode",
+				},
+			},
 		},
 	}
 
@@ -109,5 +127,20 @@ func alerts(c *cli.Context) (err error) {
 		}
 		fmt.Println(headline)
 	}
+	return nil
+}
+
+func usage(c *cli.Context) (err error) {
+	tabs := tabwriter.NewWriter(os.Stdout, 1, 0, 4, ' ', 0)
+	format := confire.DefaultTableFormat
+	if c.Bool("list") {
+		format = confire.DefaultListFormat
+	}
+
+	var conf noaalert.Config
+	if err := confire.Usagef("ensign", &conf, tabs, format); err != nil {
+		return cli.Exit(err, 1)
+	}
+	tabs.Flush()
 	return nil
 }

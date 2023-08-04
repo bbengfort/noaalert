@@ -1,0 +1,13 @@
+version: "3"
+services:
+  publisher:
+    build:
+      context: .
+      dockerfile: ./
+      args:
+        GIT_REVISION: ${GIT_REVISION}
+    image: bbengfort/noaalerts
+    init: true
+    environment:
+      - ENSIGN_CLIENT_ID
+      - ENSIGN_CLEINT_SECRET

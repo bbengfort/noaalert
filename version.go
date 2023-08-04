@@ -11,7 +11,7 @@ const (
 	VersionReleaseNumber = 1
 )
 
-// Set the GitVersion via -ldflags="-X 'github.com/rotationalio/ensign/pkg.GitVersion=$(git rev-parse --short HEAD)'"
+// Set the GitVersion via -ldflags="-X 'github.com/bbengfort/noaalert.GitVersion=$(git rev-parse --short HEAD)'"
 var GitVersion string
 
 // Version returns the semantic version for the current build.
