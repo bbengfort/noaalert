@@ -2,13 +2,11 @@ package noaalert
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"os/signal"
 	"time"
 
 	sdk "github.com/rotationalio/go-ensign"
-	mimetype "github.com/rotationalio/go-ensign/mimetype/v1beta1"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -75,6 +73,7 @@ func (p *Publisher) Run() error {
 
 	p.started = time.Now()
 	ticker := time.NewTicker(p.conf.Interval)
+	log.Info().Dur("interval", p.conf.Interval).Str("topic", p.conf.Topic).Msg("starting alerts publisher")
 
 	// Begin API query loop
 queryLoop:
@@ -83,10 +82,11 @@ queryLoop:
 		case err := <-p.echan:
 			return err
 		case <-ticker.C:
+			log.Debug().Msg("starting collection of noaa alerts")
+
 			count := 0
-			for _, alert := range p.Alerts() {
-				event := &sdk.Event{Data: alert, Mimetype: mimetype.ApplicationJSON}
-				if err := p.ensign.Publish(p.conf.Topic, event); err != nil {
+			for alert := range p.Alerts() {
+				if err := p.ensign.Publish(p.conf.Topic, alert); err != nil {
 					log.Error().Err(err).Int("count", count).Msg("could not publish weather alert")
 					continue queryLoop
 				}
@@ -94,7 +94,7 @@ queryLoop:
 				// TODO: check acks/nacks
 				count++
 			}
-			log.Info().Int("count", count).Msg("weather alerts published")
+			log.Info().Str("topic", p.conf.Topic).Int("count", count).Msg("weather alerts published")
 		}
 	}
 }
@@ -108,27 +108,26 @@ func (p *Publisher) Shutdown() (err error) {
 	return nil
 }
 
-func (p *Publisher) Alerts() [][]byte {
-	// TODO: set default timeout in configuration
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+func (p *Publisher) Alerts() <-chan *sdk.Event {
+	events := make(chan *sdk.Event)
+	go func(events chan<- *sdk.Event) {
+		defer close(events)
 
-	alerts, err := p.api.Alerts(ctx)
-	if err != nil {
-		log.Warn().Err(err).Msg("could not fetch noaa alerts")
-		return nil
-	}
+		// TODO: set default timeout in configuration
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 
-	data := make([][]byte, 0, len(alerts))
-	for _, alert := range alerts {
-		// TODO: don't republish alerts
-		alertjson, err := json.Marshal(alert)
+		alerts, err := p.api.Alerts(ctx)
 		if err != nil {
-			log.Warn().Err(err).Msg("could not parse alert json")
-			continue
+			log.Warn().Err(err).Msg("could not fetch noaa alerts")
+			return
 		}
-		data = append(data, alertjson)
-	}
 
-	return data
+		log.Debug().Int("nalerts", len(alerts)).Msg("received alerts from NOAA")
+		for _, alert := range alerts {
+			// TODO: don't republish alerts
+			events <- alert.Event()
+		}
+	}(events)
+	return events
 }

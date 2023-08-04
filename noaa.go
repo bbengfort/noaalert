@@ -44,7 +44,7 @@ func NewWeatherAPI() (api *Weather, err error) {
 	return api, nil
 }
 
-func (s *Weather) Alerts(ctx context.Context) (_ []interface{}, err error) {
+func (s *Weather) Alerts(ctx context.Context) (_ []*AlertEvent, err error) {
 	var req *http.Request
 	if req, err = s.NewRequest(ctx, http.MethodGet, "/alerts/active", nil, nil); err != nil {
 		return nil, err
@@ -71,7 +71,33 @@ func (s *Weather) Alerts(ctx context.Context) (_ []interface{}, err error) {
 	}
 
 	if features, ok := alerts["features"]; ok {
-		return features.([]interface{}), nil
+		if featureList, ok := features.([]interface{}); ok {
+			// Get the NOAA request headers to create events
+			correlationID := rep.Header.Get("X-Correlation-Id")
+			requestID := rep.Header.Get("X-Request-Id")
+			serverID := rep.Header.Get("X-Server-Id")
+			lastModified := rep.Header.Get("Last-Modified")
+			expires := rep.Header.Get("Expires")
+
+			events := make([]*AlertEvent, 0, len(featureList))
+			for _, feature := range featureList {
+				event := &AlertEvent{
+					CorrelationID: correlationID,
+					RequestID:     requestID,
+					ServerID:      serverID,
+					LastModified:  lastModified,
+					Expires:       expires,
+				}
+
+				if event.Data, err = json.Marshal(feature); err != nil {
+					return nil, err
+				}
+
+				events = append(events, event)
+			}
+
+			return events, nil
+		}
 	}
 	return nil, fmt.Errorf("no alerts returned")
 }

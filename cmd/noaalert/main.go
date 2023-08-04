@@ -8,7 +8,6 @@ import (
 
 	"github.com/bbengfort/noaalert"
 	"github.com/joho/godotenv"
-	"github.com/rotationalio/go-ensign"
 	"github.com/rs/zerolog/log"
 	cli "github.com/urfave/cli/v2"
 )
@@ -72,16 +71,19 @@ func subscribe(c *cli.Context) (err error) {
 		return cli.Exit(err, 1)
 	}
 
-	var events *ensign.Subscription
-	if events, err = sub.Listen(); err != nil {
-		return cli.Exit(err, 1)
-	}
-	defer events.Close()
+	err = sub.Run(func(alert *noaalert.AlertEvent) (err error) {
+		var headline string
+		if headline, err = alert.Headline(); err != nil {
+			log.Warn().Err(err).Msg("could not get headline from alert")
+			return nil
+		}
 
-	for event := range events.C {
-		// TODO: do a better job of printing events out
-		fmt.Println(event)
-		event.Ack()
+		log.Info().Msg(headline)
+		return nil
+	})
+
+	if err != nil {
+		return cli.Exit(err, 1)
 	}
 	return nil
 }
@@ -95,19 +97,17 @@ func alerts(c *cli.Context) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var features []interface{}
-	if features, err = api.Alerts(ctx); err != nil {
+	var events []*noaalert.AlertEvent
+	if events, err = api.Alerts(ctx); err != nil {
 		return cli.Exit(err, 1)
 	}
 
-	for _, feature := range features {
-		fmap := feature.(map[string]interface{})
-		props := fmap["properties"].(map[string]interface{})
-
-		headline, ok := props["headline"].(string)
-		if ok {
-			fmt.Println(headline)
+	for _, event := range events {
+		var headline string
+		if headline, err = event.Headline(); err != nil {
+			continue
 		}
+		fmt.Println(headline)
 	}
 	return nil
 }

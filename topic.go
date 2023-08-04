@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rotationalio/go-ensign"
+	"github.com/rs/zerolog/log"
 )
 
 // EnsureTopicExists checks if the topic exists, and if it doesn't, it creates it.
@@ -16,9 +17,12 @@ func EnsureTopicExists(client *ensign.Client, topic string) (err error) {
 	if exists, err = client.TopicExists(ctx, topic); err != nil {
 		return err
 	}
+	log.Debug().Bool("exists", exists).Msg("topic exists check")
 
 	if !exists {
-		if _, err = client.CreateTopic(ctx, topic); err != nil {
+		var topicID string
+		if topicID, err = client.CreateTopic(ctx, topic); err != nil {
+			log.Info().Str("topic", topic).Str("topic_id", topicID).Msg("topic created")
 			return err
 		}
 	}
