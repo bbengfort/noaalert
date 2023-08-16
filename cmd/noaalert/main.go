@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -10,6 +11,8 @@ import (
 	"github.com/bbengfort/noaalert"
 	"github.com/joho/godotenv"
 	confire "github.com/rotationalio/confire/usage"
+	"github.com/rotationalio/go-ensign"
+	api "github.com/rotationalio/go-ensign/api/v1beta1"
 	"github.com/rs/zerolog/log"
 	cli "github.com/urfave/cli/v2"
 )
@@ -28,6 +31,12 @@ func main() {
 			Usage:    "run the publisher daemon to fetch alerts from the NOAA API",
 			Category: "server",
 			Action:   publish,
+		},
+		{
+			Name:     "info",
+			Usage:    "fetch project info stats and usage",
+			Category: "utility",
+			Action:   projectInfo,
 		},
 		{
 			Name:     "subscribe",
@@ -142,5 +151,33 @@ func usage(c *cli.Context) (err error) {
 		return cli.Exit(err, 1)
 	}
 	tabs.Flush()
+	return nil
+}
+
+func projectInfo(c *cli.Context) (err error) {
+	var conf noaalert.Config
+	if conf, err = noaalert.NewConfig(); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	var client *ensign.Client
+	if client, err = ensign.New(conf.Ensign.Options()...); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	var info *api.ProjectInfo
+	if info, err = client.Info(ctx); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	if err = encoder.Encode(info); err != nil {
+		return cli.Exit(err, 1)
+	}
+
 	return nil
 }
