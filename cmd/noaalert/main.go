@@ -51,6 +51,29 @@ func main() {
 			Action:   alerts,
 		},
 		{
+			Name:     "query",
+			Category: "utility",
+			Usage:    "query the event stream for previous events",
+			Action:   query,
+			Flags: []cli.Flag{
+				&cli.IntFlag{
+					Name:    "offset",
+					Aliases: []string{"O"},
+					Value:   0,
+				},
+				&cli.IntFlag{
+					Name:    "limit",
+					Aliases: []string{"l"},
+					Value:   20,
+				},
+				&cli.StringFlag{
+					Name:    "output",
+					Aliases: []string{"o"},
+					Value:   "query.jsonlines",
+				},
+			},
+		},
+		{
 			Name:     "config",
 			Usage:    "print noaalerts configuration guide",
 			Category: "utility",
@@ -179,5 +202,41 @@ func projectInfo(c *cli.Context) (err error) {
 		return cli.Exit(err, 1)
 	}
 
+	return nil
+}
+
+func query(c *cli.Context) (err error) {
+	var conf noaalert.Config
+	if conf, err = noaalert.NewConfig(); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	var client *ensign.Client
+	if client, err = ensign.New(conf.Ensign.Options()...); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	var alerts *noaalert.AlertIterator
+	if alerts, err = noaalert.Query(client, c.Int("offset"), c.Int("limit")); err != nil {
+		return cli.Exit(err, 1)
+	}
+	defer alerts.Release()
+
+	var f *os.File
+	if f, err = os.Create(c.String("output")); err != nil {
+		return cli.Exit(err, 1)
+	}
+	defer f.Close()
+
+	for alerts.Next() {
+		if _, err = f.Write(alerts.Alert().Data); err != nil {
+			return cli.Exit(err, 1)
+		}
+		f.Write([]byte("\n"))
+	}
+
+	if err = alerts.Error(); err != nil {
+		return cli.Exit(err, 1)
+	}
 	return nil
 }
